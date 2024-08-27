@@ -11,38 +11,47 @@ import TopHeadlinesErrorInstance, { TopHeadlinesError } from "@/utils/top-headli
 import { useCountdown } from "@/hooks/utils/useCountDown";
 import TopHeadlinesLocalStorageDataSource from "../datasource/topHeadlines.localstorage.datasource";
 
+/**
+ * A custom hook that manages the fetching, caching, and manipulation of top headlines data.
+ * It handles network requests, local storage operations, and state management for the top headlines.
+ *
+ * @returns An object containing various state variables and functions related to top headlines.
+ */
 function useTopHeadlinesRepository() {
+  // State variables
   const [response, setResponse] = useState<null | TopHeadlinesModel>(null);
-  const [currentList, setCurrentList] = useState<ArticleModel[]>([])
+  const [currentList, setCurrentList] = useState<ArticleModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AxiosError | LocalStorageErrorInstance | null | string>(null);
-  const [currentPinnedList, setCurrentPinnedList] = useState<ArticleModel[]>([])
+  const [currentPinnedList, setCurrentPinnedList] = useState<ArticleModel[]>([]);
   const [deleting, setDeleting] = useState(false);
 
+  // useRef for storing the current app state
   const appState = useRef(AppState.currentState);
 
-  const [count, { startCountdown, stopCountdown, resetCountdown,  }] = useCountdown({
+  // useCountdown hook for managing a countdown timer
+  const [count, { startCountdown, stopCountdown, resetCountdown }] = useCountdown({
     countStart: 1,
     intervalMs: 10000,
   });
 
+  // useEffect for fetching top headlines, populating the pinned list, and cleaning up on unmount
   useEffect(() => {
     getTopHeadlines();
     populateCurrentPinnedList();
     return () => {
       stopAndResetCounter();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    };
   }, []);
 
+  // useEffect for fetching more articles when the countdown reaches 0
   useEffect(() => {
-      if (count <= 0) {
-        fetchMore(5)
-      }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count])
-  
+    if (count <= 0) {
+      fetchMore(5);
+    }
+  }, [count]);
 
+  // useEffect for handling app state changes (foreground/background)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (
@@ -50,12 +59,12 @@ function useTopHeadlinesRepository() {
         nextAppState === 'active'
       ) {
         // App State is in foreground
-        startCountdown()
-        refetchOnFocusIfDataChanged()
-      } 
-      if (nextAppState === "background") {
+        startCountdown();
+        refetchOnFocusIfDataChanged();
+      }
+      if (nextAppState === 'background') {
         // App State is in background
-        stopAndResetCounter()
+        stopAndResetCounter();
       }
       appState.current = nextAppState;
     });
@@ -63,32 +72,36 @@ function useTopHeadlinesRepository() {
     return () => {
       subscription.remove();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Function to populate the current pinned list from local storage
   const populateCurrentPinnedList = async () => {
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-    const pinnedList = await localStorageDataSource.getTopHeadlinesPinnedList()
-    setCurrentPinnedList(pinnedList ?? [])
-  }
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+    const pinnedList = await localStorageDataSource.getTopHeadlinesPinnedList();
+    setCurrentPinnedList(pinnedList ?? []);
+  };
 
+  // Function to stop and reset the countdown timer
   const stopAndResetCounter = () => {
     stopCountdown();
     resetCountdown();
-  }
+  };
 
+  // Function to refetch top headlines if data has changed when the app comes into the foreground
   const refetchOnFocusIfDataChanged = async () => {
     const shouldRefetch = await shouldRefetchOnFocus();
     if (shouldRefetch) {
-      refetch()
+      refetch();
     }
-  }
+  };
 
+  // Function to check if top headlines data has changed when the app comes into the foreground
   const shouldRefetchOnFocus = async () => {
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-    return await localStorageDataSource.getTopHeadlinesChangedFlag()
-  }
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+    return await localStorageDataSource.getTopHeadlinesChangedFlag();
+  };
 
+  // Function to fetch more articles and append them to the current list
   const fetchMore = async (count: number, resetList: boolean = false) => {
     try {
       stopAndResetCounter();
@@ -98,126 +111,140 @@ function useTopHeadlinesRepository() {
           return moreRandomArticles;
         }
         return [...moreRandomArticles, ...prev];
-      })
+      });
     } catch (error) {
-        if (error instanceof TopHeadlinesErrorInstance) {
-          if (error.message === TopHeadlinesError.RANDOM_ARTICLES_EXHAUSTED) {
-            refetch()
-          }
+      if (error instanceof TopHeadlinesErrorInstance) {
+        if (error.message === TopHeadlinesError.RANDOM_ARTICLES_EXHAUSTED) {
+          refetch();
         }
+      }
     } finally {
       startCountdown();
     }
-  }
+  };
 
+  // Function to refetch top headlines
   const refetch = async () => {
-      const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-      await localStorageDataSource.removeCurrentHeadlinesMaxIndex();
-      await localStorageDataSource.setTopHeadlinesChangedFlag(false);
-      await getTopHeadlines("network");
-  }
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+    await localStorageDataSource.removeCurrentHeadlinesMaxIndex();
+    await localStorageDataSource.setTopHeadlinesChangedFlag(false);
+    await getTopHeadlines('network');
+  };
 
+  // Function to fetch top headlines from local storage
   const getHeadlinesFromOfflineStorage = async () => {
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
     return await localStorageDataSource.getTopHeadlines();
-  }
+  };
 
+  // Function to fetch top headlines from a network call
   const getHeadlinesFromNetworkCall = async (page: number) => {
     const networkDataSource = new TopHeadlinesDataSource();
-    return await networkDataSource.getTopHeadlines(page)
-  }
+    return await networkDataSource.getTopHeadlines(page);
+  };
 
-  const getTopHeadlines = async (fetchMode: "network" | "offline" = "offline") => {
+  // Function to fetch top headlines, handling network and local storage operations
+  const getTopHeadlines = async (fetchMode: 'network' | 'offline' = 'offline') => {
     stopAndResetCounter();
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      let headlines: TopHeadlinesModel | undefined
+      let headlines: TopHeadlinesModel | undefined;
       headlines = await getHeadlinesFromOfflineStorage();
-      if (headlines == null || fetchMode !== "offline") {
-          const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-          
-          let pageNumber = await localStorageDataSource.getTopHeadlinesPage();
-          if (pageNumber == null) {
-            pageNumber = 1
-          } else {
-            if (headlines != null) {
-              pageNumber++
-            }
+      if (headlines == null || fetchMode !== 'offline') {
+        const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+
+        let pageNumber = await localStorageDataSource.getTopHeadlinesPage();
+        if (pageNumber == null) {
+          pageNumber = 1;
+        } else {
+          if (headlines != null) {
+            pageNumber++;
           }
-          headlines = await getHeadlinesFromNetworkCall(pageNumber);
-          if (headlines == null)  {
-            throw new Error("No top headlines available")
-          }
-          await localStorageDataSource.setTopHeadlines(headlines);
-          await localStorageDataSource.setTopHeadlinesPage(pageNumber)
+        }
+        headlines = await getHeadlinesFromNetworkCall(pageNumber);
+        if (headlines == null) {
+          throw new Error('No top headlines available');
+        }
+        await localStorageDataSource.setTopHeadlines(headlines);
+        await localStorageDataSource.setTopHeadlinesPage(pageNumber);
       }
-      setResponse(headlines)
-      await fetchMore(10, fetchMode === "network");
+      setResponse(headlines);
+      await fetchMore(10, fetchMode === 'network');
     } catch (error) {
       if (error instanceof AxiosError) {
         // Handle network errors
-        setError(error)
+        setError(error);
       } else if (error instanceof LocalStorageErrorInstance) {
         // Handle local storage errors
-        setError(error)
+        setError(error);
       }
-      const unknownError = error as UnknownError
+      const unknownError = error as UnknownError;
       // Handle other unknown errors
-      setError(unknownError?.message)
+      setError(unknownError?.message);
     } finally {
       setIsLoading(false);
-     }
-  }
+    }
+  };
 
+  // Function to add an article to the pinned list
   const addToPinnedList = (index: number) => {
-    stopCountdown()
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
+    stopCountdown();
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
     try {
-      var articleToPin = currentList[index]
+      var articleToPin = currentList[index];
     } catch (error) {
-      startCountdown()
+      startCountdown();
       // Handle index out of bounds error
       return;
     }
-    if (articleToPin != null)  {
-      const newPinnedList = [...currentPinnedList, articleToPin]
-      setCurrentPinnedList(newPinnedList)
-      localStorageDataSource.setTopHeadlinesPinnedList(newPinnedList)
-      removeArticleFromStateAndStorage(articleToPin.title)
+    if (articleToPin != null) {
+      const newPinnedList = [...currentPinnedList, articleToPin];
+      setCurrentPinnedList(newPinnedList);
+      localStorageDataSource.setTopHeadlinesPinnedList(newPinnedList);
+      removeArticleFromStateAndStorage(articleToPin.title);
     }
-  }
+  };
 
+  // Function to remove an article from the pinned list
   const removeFromPinnedList = (title: string) => {
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-    const newPinnedList = currentPinnedList.filter(article => article.title !== title)
-    setCurrentPinnedList(newPinnedList)
-    localStorageDataSource.setTopHeadlinesPinnedList(newPinnedList)
-  }
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+    const newPinnedList = currentPinnedList.filter(article => article.title !== title);
+    setCurrentPinnedList(newPinnedList);
+    localStorageDataSource.setTopHeadlinesPinnedList(newPinnedList);
+  };
 
-  const deleteArticle  = async (title: string) => {
+  // Function to delete an article from the top headlines
+  const deleteArticle = async (title: string) => {
     stopCountdown();
-    setDeleting(true)
-    removeArticleFromStateAndStorage(title)
-    setDeleting(false)
-    startCountdown()
-  }
+    setDeleting(true);
+    removeArticleFromStateAndStorage(title);
+    setDeleting(false);
+    startCountdown();
+  };
 
+  // Function to remove an article from the state and local storage
   const removeArticleFromStateAndStorage = async (title: string) => {
-    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource()
-    const newList = currentList.filter(article => article.title !== title)
+    const localStorageDataSource = new TopHeadlinesLocalStorageDataSource();
+    const newList = currentList.filter(article => article.title !== title);
     const currentTopHeadlines = await localStorageDataSource.getTopHeadlines();
     const currentTopHeadlinesArticles = currentTopHeadlines?.articles;
     if (currentTopHeadlinesArticles != null) {
-      const newTopHeadlinesArticles = currentTopHeadlinesArticles.filter(article => article.title !== title)
-      await localStorageDataSource.setTopHeadlines({ ...currentTopHeadlines, articles: newTopHeadlinesArticles } as TopHeadlinesModel);
+      const newTopHeadlinesArticles = currentTopHeadlinesArticles.filter(
+        article => article.title !== title
+      );
+      await localStorageDataSource.setTopHeadlines({
+        ...currentTopHeadlines,
+        articles: newTopHeadlinesArticles,
+      } as TopHeadlinesModel);
     }
-    setCurrentList(newList)
-  }
+    setCurrentList(newList);
+  };
 
+  // Return the object containing various state variables and functions related to top headlines
   return {
-    response, 
+    response,
     isLoading,
     error,
     getTopHeadlines,
@@ -227,8 +254,7 @@ function useTopHeadlinesRepository() {
     removeFromPinnedList,
     currentPinnedList,
     deleteArticle,
-    deleting
-  }
+    deleting,
+  };
 }
-
 export default useTopHeadlinesRepository;
