@@ -1,5 +1,7 @@
 # 👋 Welcome to your Expo News App 📰
 
+Checkout video demo of the app - [Click Here](https://drive.google.com/file/d/1lGRbX_r8n4mAOUPiJROuBQST8Ns16XnT/view?usp=drive_link)
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
