@@ -44,7 +44,7 @@ Refer above links to open the app in an environment of your choice.
 
 3. A background task is running behind the scenes which will automatically fetch these articles. The minimum time on android is given as 1 minute in order to avoid user time issues while developing. For iOS the developer will have to manually trigger the background task using instruments app on macOS. [Refer this](https://docs.expo.dev/versions/latest/sdk/background-fetch/).
 
-4. Assuming that the headlines api server updates after every 1 minute. The background task will automatically fetch page number 1 with 100 articles. This background fetch should usually be triggered after 12 to 24 hours in production.
+4. Assuming that the headlines api server updates after every 1 minute. The background task will automatically fetch page number 1 with 100 articles.
 
 5. There is an option for user to manually trigger the network call to fetch articles either by pull to refresh on the screen or the refresh button present on the title bar. This manual trigger will fetch the next page number with 100 articles from network.
 
